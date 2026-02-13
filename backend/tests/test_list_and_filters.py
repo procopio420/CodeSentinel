@@ -40,11 +40,17 @@ async def test_list_filters(client):
 
     resp_all = await client.get("/api/reviews?page=1&page_size=10")
     assert resp_all.status_code == 200
-    items = resp_all.json()
+    data = resp_all.json()
+    assert "items" in data
+    assert "total" in data
+    assert "page" in data
+    assert "page_size" in data
+    items = data["items"]
     assert len(items) >= 2
 
     resp = await client.get("/api/reviews?language=python&min_score=5")
     assert resp.status_code == 200
-    items = resp.json()
+    data = resp.json()
+    items = data["items"]
     assert all(it["language"] == "python" for it in items)
     assert all((it["score"] or 0) >= 5 for it in items)

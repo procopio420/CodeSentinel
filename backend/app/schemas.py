@@ -109,3 +109,10 @@ class StatsOut(BaseModel):
     total: int
     avg_score: Optional[float]
     common_issues: List[str]
+
+
+class PaginatedReviewsOut(BaseModel):
+    items: List[ReviewOut]
+    total: int
+    page: int
+    page_size: int

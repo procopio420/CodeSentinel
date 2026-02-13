@@ -44,14 +44,39 @@ def code_hash(language: str, code: str) -> str:
     return h.hexdigest()
 
 
-async def cache_get_review_id(code_hash: str) -> Optional[str]:
+async def cache_get_review_id(code_hash: str, scope: str = "public") -> Optional[str]:
+    """
+    Get cached review ID for a code hash.
+    
+    Args:
+        code_hash: SHA-256 hash of normalized code
+        scope: Optional scope for cache key (default: "public")
+               Allows future per-user/org scoping without breaking existing cache
+    """
     r = await get_cache()
-    return await r.get(_k(f"codehash:{code_hash}"))
+    # Try new format first (with scope)
+    key = _k(f"codehash:{scope}:{code_hash}")
+    result = await r.get(key)
+    if result:
+        return result
+    # Fallback to old format (backward compatibility)
+    old_key = _k(f"codehash:{code_hash}")
+    return await r.get(old_key)
 
 
 async def cache_set_review_id(
-    code_hash: str, review_id: str, ttl: Optional[int] = None
+    code_hash: str, review_id: str, ttl: Optional[int] = None, scope: str = "public"
 ):
+    """
+    Cache review ID for a code hash.
+    
+    Args:
+        code_hash: SHA-256 hash of normalized code
+        review_id: Review ID to cache
+        ttl: Optional TTL in seconds (default: from settings)
+        scope: Optional scope for cache key (default: "public")
+               Allows future per-user/org scoping without breaking existing cache
+    """
     r = await get_cache()
-    key = _k(f"codehash:{code_hash}")
+    key = _k(f"codehash:{scope}:{code_hash}")
     await r.set(key, review_id, ex=ttl or int(settings.CACHE_TTL_SECONDS))

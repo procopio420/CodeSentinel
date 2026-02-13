@@ -92,6 +92,11 @@ async def test_sse_transition_to_done(client):
 
     async def finisher():
         await asyncio.sleep(0.1)
+        # Publish in_progress event
+        from app.events import publish_status
+        await publish_status(str(sub_id), "in_progress")
+        await asyncio.sleep(0.05)
+        
         r_ins = await dbmod.reviews.insert_one(
             {
                 "submission_id": sub_id,
@@ -120,6 +125,8 @@ async def test_sse_transition_to_done(client):
                 }
             },
         )
+        # Publish completed event
+        await publish_status(str(sub_id), "completed", {"review_id": str(r_ins.inserted_id)})
 
     fin_task = asyncio.create_task(finisher())
 

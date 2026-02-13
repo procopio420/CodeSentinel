@@ -8,6 +8,7 @@ from .routes import reviews, stats, health
 from .db import init_db, close_db
 from .cache import init_cache, close_cache
 from .rate_limit import init_rate_limiter, close_rate_limiter
+from .events import init_events, close_events
 
 
 def origin_from_url(url: str) -> str:
@@ -20,9 +21,11 @@ async def lifespan(app: FastAPI):
     await init_db()
     await init_cache()
     await init_rate_limiter()
+    await init_events()
     try:
         yield
     finally:
+        await close_events()
         await close_rate_limiter()
         await close_cache()
         await close_db()

@@ -46,12 +46,20 @@ export interface StatsResponse {
 
 export interface ListReviewsParams {
   language?: string;
+  status?: string;
   min_score?: number;
   max_score?: number;
   start_date?: string
   end_date?: string; 
   page?: number;
   page_size?: number;
+}
+
+export interface PaginatedReviewsResponse {
+  items: Review[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
 export interface GetStatsParams {

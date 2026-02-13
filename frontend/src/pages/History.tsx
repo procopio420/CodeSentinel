@@ -2,11 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { getStats, listReviews } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import ReviewCard from "@/components/ReviewCard";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HistoryFilters, type HistoryFilterValue } from "@/components/HistoryFilters";
 import { endOfDay } from "date-fns";
-import type { Review, StatsResponse, GetStatsParams, ListReviewsParams } from "@/lib/types";
+import type { Review, StatsResponse, GetStatsParams, ListReviewsParams, PaginatedReviewsResponse } from "@/lib/types";
 
 const DEFAULT_FILTERS: HistoryFilterValue = {
   language: "all",
@@ -14,8 +14,8 @@ const DEFAULT_FILTERS: HistoryFilterValue = {
   date: undefined,
 };
 
-function toReviewParams(f: HistoryFilterValue): ListReviewsParams {
-  const params: ListReviewsParams = { page: 1, page_size: 20 };
+function toReviewParams(f: HistoryFilterValue, page: number = 1): ListReviewsParams {
+  const params: ListReviewsParams = { page, page_size: 20 };
   if (f.language && f.language !== "all") params.language = f.language;
   const [min, max] = f.scoreRange ?? [0, 10];
   if (min > 0) params.min_score = min;
@@ -44,11 +44,21 @@ type CsvRow = {
 export default function History() {
   const [filters, setFilters] = useState<HistoryFilterValue>(DEFAULT_FILTERS);
   const [applied, setApplied] = useState<HistoryFilterValue>(DEFAULT_FILTERS);
+  const [page, setPage] = useState(1);
 
-  const reviewParams = useMemo(() => toReviewParams(applied), [applied]);
+  // Debounce filter updates (500ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setApplied(filters);
+      setPage(1); // Reset to first page when filters change
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [filters]);
+
+  const reviewParams = useMemo(() => toReviewParams(applied, page), [applied, page]);
   const statsParams = useMemo(() => toStatsParams(applied), [applied]);
 
-  const reviewsQ = useQuery<Review[], Error>({
+  const reviewsQ = useQuery<PaginatedReviewsResponse, Error>({
     queryKey: ["reviews", reviewParams],
     queryFn: () => listReviews(reviewParams),
   });
@@ -58,18 +68,24 @@ export default function History() {
     queryFn: () => getStats(statsParams),
   });
 
-  const items = reviewsQ.data ?? [];
+  const items = reviewsQ.data?.items ?? [];
+  const total = reviewsQ.data?.total ?? 0;
+  const pageSize = reviewsQ.data?.page_size ?? 20;
+  const totalPages = Math.ceil(total / pageSize);
 
   function onApply() {
     setApplied(filters);
+    setPage(1);
   }
 
   function onReset() {
     setFilters(DEFAULT_FILTERS);
     setApplied(DEFAULT_FILTERS);
+    setPage(1);
   }
 
   function exportCSV() {
+    // Export all items from current page (could be extended to export all)
     const rows: CsvRow[] = items.map((r) => ({
       id: r.id,
       language: r.language,
@@ -102,12 +118,45 @@ export default function History() {
       </div>
 
       <div className="md:flex justify-center gap-3">
-        <div className="grid-gap">
+        <div className="grid-gap flex-1">
           {reviewsQ.isLoading && <div>Loading...</div>}
           {reviewsQ.error && <div className="text-rose-300">{reviewsQ.error.message}</div>}
           {items.map((r) => <ReviewCard marginTop={2} key={r.id} review={r} />)}
           {!reviewsQ.isLoading && items.length === 0 && (
             <div className="text-sm text-muted-foreground">No results.</div>
+          )}
+          
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-muted-foreground">
+                Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, total)} of {total} reviews
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1 || reviewsQ.isLoading}
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1 text-sm">
+                  <span>Page</span>
+                  <span className="font-medium">{page}</span>
+                  <span>of</span>
+                  <span className="font-medium">{totalPages}</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages || reviewsQ.isLoading}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </div>
 

@@ -1,5 +1,5 @@
 import { getJSON, postJSON } from './http';
-import type { GetStatsParams, ListReviewsParams, Review, StatsResponse, SubmitPayload, SubmitResponse } from './types';
+import type { GetStatsParams, ListReviewsParams, PaginatedReviewsResponse, Review, StatsResponse, SubmitPayload, SubmitResponse } from './types';
 
 const BASE = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000';
 
@@ -14,8 +14,8 @@ export function getReview(id: string): Promise<Review> {
   return getJSON<Review>(`${BASE}/api/reviews/${id}`);
 }
 
-export function listReviews(params: ListReviewsParams): Promise<Review[]> {
-  return getJSON<Review[]>(`${BASE}/api/reviews${buildQueryParams({ ...params })}`);
+export function listReviews(params: ListReviewsParams): Promise<PaginatedReviewsResponse> {
+  return getJSON<PaginatedReviewsResponse>(`${BASE}/api/reviews${buildQueryParams({ ...params })}`);
 }
 
 export function getStats(params: GetStatsParams): Promise<StatsResponse> {

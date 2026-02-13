@@ -12,6 +12,7 @@ class Settings(BaseSettings):
 
     RATE_LIMIT_REDIS_URL: str = "redis://localhost:6379/1"
     RATE_LIMIT_PER_HOUR: int = 10
+    TRUSTED_PROXY_HEADERS: bool = False
 
     CACHE_ENABLED: bool = True
     CACHE_REDIS_URL: str = "redis://localhost:6379/2"

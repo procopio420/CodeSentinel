@@ -49,6 +49,7 @@ async def _isolate_env_and_counters():
         settings, "CACHE_REDIS_URL", "redis://localhost:6379/2"
     )
 
+    # Events use CACHE_REDIS_URL, so flush it
     for url in {settings.RATE_LIMIT_REDIS_URL, settings.CACHE_REDIS_URL}:
         r = aioredis.from_url(url, decode_responses=True)
         try:
@@ -58,20 +59,28 @@ async def _isolate_env_and_counters():
 
     import app.rate_limit as ratelimit
     import app.cache as cache
+    import app.events as events
 
     try:
-        if getattr(ratelimit, "_rate_redis", None) is not None:
-            await ratelimit._rate_redis.aclose()
+        if getattr(ratelimit, "_rate", None) is not None:
+            await ratelimit._rate.aclose()
     except Exception:
         pass
-    ratelimit._rate_redis = None
+    ratelimit._rate = None
 
     try:
-        if getattr(cache, "_r", None) is not None:
-            await cache._r.aclose()
+        if getattr(cache, "_redis", None) is not None:
+            await cache._redis.aclose()
     except Exception:
         pass
-    cache._r = None
+    cache._redis = None
+
+    try:
+        if getattr(events, "_redis", None) is not None:
+            await events._redis.aclose()
+    except Exception:
+        pass
+    events._redis = None
 
     yield
 

@@ -5,7 +5,7 @@ import CodeInput from "@/components/CodeInput";
 import LiveQueue from "@/components/LiveQueue";
 import { useReviewSSE } from "@/hooks/useReviewSSE";
 import { submitReview, getReview, listReviews } from "@/lib/api";
-import type { Language, Review } from "@/lib/types";
+import type { Language, Review, PaginatedReviewsResponse } from "@/lib/types";
 
 export default function Submit() {
   const queryClient = useQueryClient();
@@ -21,7 +21,7 @@ export default function Submit() {
     await submitMutation.mutateAsync({ language: language.value, code });
   }
 
-  const liveQueueQuery = useQuery<Review[], Error>({
+  const liveQueueQuery = useQuery<PaginatedReviewsResponse, Error>({
     queryKey: ["reviews"],
     queryFn: () => listReviews({ page_size: 5 })
   });
@@ -37,7 +37,7 @@ export default function Submit() {
     onMutate: async (payload: { language: string; code: string }) => {
       await queryClient.cancelQueries({ queryKey: ["reviews"] });
 
-      const previous = queryClient.getQueryData<Review[]>(["reviews"]) ?? [];
+      const previous = queryClient.getQueryData<PaginatedReviewsResponse>(["reviews"]) ?? { items: [], total: 0, page: 1, page_size: 5 };
 
       const tempId = `temp-${Date.now()}`;
       const optimistic: Review = {
@@ -54,9 +54,14 @@ export default function Submit() {
         error: null,
       };
 
-      queryClient.setQueryData<Review[]>(["reviews"], (old) => {
-        const base = old ?? [];
-        return [optimistic, ...base].slice(0, 5);
+      queryClient.setQueryData<PaginatedReviewsResponse>(["reviews"], (old) => {
+        const base = old?.items ?? [];
+        return {
+          items: [optimistic, ...base].slice(0, 5),
+          total: (old?.total ?? 0) + 1,
+          page: old?.page ?? 1,
+          page_size: old?.page_size ?? 5,
+        };
       });
 
       return { previous, tempId };
@@ -64,16 +69,17 @@ export default function Submit() {
     onSuccess: (res, _payload, ctx) => {
       setId(res.id);
 
-      queryClient.setQueryData<Review[]>(["reviews"], (old) => {
-        const list = old ?? [];
-        return list.map((r) =>
+      queryClient.setQueryData<PaginatedReviewsResponse>(["reviews"], (old) => {
+        if (!old) return { items: [], total: 0, page: 1, page_size: 5 };
+        const items = old.items.map((r) =>
           r.id === ctx?.tempId ? { ...r, id: res.id, status: res.status } : r
         );
+        return { ...old, items };
       });
     },
     onError: (err, _payload, ctx) => {
       if (ctx) {
-        queryClient.setQueryData<Review[]>(["reviews"], ctx.previous);
+        queryClient.setQueryData<PaginatedReviewsResponse>(["reviews"], ctx.previous);
       }
       const msg = err instanceof Error ? err.message : "Submit failed";
       console.log('aqui?', err?.message)
@@ -115,7 +121,7 @@ export default function Submit() {
         }}
       />
 
-      {!!liveQueueQuery?.data?.length && <LiveQueue items={liveQueueQuery?.data} />}
+      {!!liveQueueQuery?.data?.items?.length && <LiveQueue items={liveQueueQuery.data.items} />}
     </div>
   );
 }
